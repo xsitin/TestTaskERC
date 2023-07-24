@@ -1,11 +1,16 @@
+using AreaAccountApi.Filters;
+using AreaAccountApi.Services;
+using AreaAccountApi.Sieve.Filters;
+using AreaAccountData.Contexts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
+using Sieve.Services;
 
-namespace AreaAccountService
+namespace AreaAccountApi
 {
     public class Startup
     {
@@ -19,11 +24,15 @@ namespace AreaAccountService
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddDbContext<AreaAccountContext>();
+            services.AddScoped<SieveProcessor>();
+            services.AddControllers(options => options.Filters.Add<HttpGlobalExceptionFilter>());
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "AreaAccountService", Version = "v1" });
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "AreaAccountApi", Version = "v1" });
             });
+            services.AddScoped<IAccountService, AccountService>();
+            services.AddScoped<ISieveCustomFilterMethods, AreaAccountCustomFilters>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -33,8 +42,12 @@ namespace AreaAccountService
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "AreaAccountService v1"));
+                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "AreaAccountApi v1"));
             }
+
+            using var scope = app.ApplicationServices.CreateScope();
+            using var context = scope.ServiceProvider.GetService<AreaAccountContext>();
+            context.Database.EnsureCreated();
 
             app.UseHttpsRedirection();
 
